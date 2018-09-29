@@ -173,6 +173,11 @@ static struct cpufreq_interactive_tunables *cached_common_tunables;
 
 static struct attribute_group *get_sysfs_attr(void);
 
+static bool is_sh(struct task_struct *p)
+{
+	return !strncmp(p->comm, "sh", sizeof("sh"));
+}
+
 /* Round to starting jiffy of next evaluation window */
 static u64 round_to_nw_start(u64 jif,
 			     struct cpufreq_interactive_tunables *tunables)
@@ -1099,7 +1104,7 @@ static ssize_t store_min_sample_time(struct cpufreq_interactive_tunables
 	ret = kstrtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
-	if (!initd)
+	if (is_sh(current))
 		tunables->min_sample_time = val;
 
 	return count;
