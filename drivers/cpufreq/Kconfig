@@ -441,3 +441,20 @@ config QORIQ_CPUFREQ
 
 endif
 endmenu
+
+config CPU_FREQ_MIN_CLUSTER1
+  int "Default min frequency on boot (little)"
+  default 633600
+
+config CPU_FREQ_MAX_CLUSTER1
+  int "Default max frequency on boot (little)"
+  default 1612800
+
+config CPU_FREQ_MIN_CLUSTER2
+  int "Default min frequency on boot (big)"
+  default 1113600
+
+config CPU_FREQ_MAX_CLUSTER2
+  int "Default max frequency on boot (big)"
+  default 1804800
+
