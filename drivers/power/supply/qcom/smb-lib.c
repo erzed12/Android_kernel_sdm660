@@ -72,6 +72,31 @@
 static unsigned int forced_current = 0;
 module_param(forced_current, uint, S_IWUSR | S_IRUGO);
 
+/*
+charge_mode	:	SMBCHG_FAST_CHG_CURRENT_VALUE
+0			:	2000MA
+1			:	2050MA
+2			:	2500MA
+3			:	2850MA
+4			:	3000MA
+other		:	2000MA
+*/
+static unsigned int charge_mode = 1;
+module_param(charge_mode, uint, S_IWUSR | S_IRUGO);
+
+/*
+adapter_ceeling_current	:	ICL VALUE
+0						:	2000MA
+1						:	2050MA
+2						:	2500MA
+3						:	2850MA
+4						:	3000MA
+5						:	1000MA
+other					:	2000MA
+*/
+static unsigned int adapter_ceeling_current = 2;
+module_param(adapter_ceeling_current, uint, S_IWUSR | S_IRUGO);
+
 extern struct smb_charger *smbchg_dev;
 /* Huaqin add for ZQL1650-68 systme suspend 1 min run sw jeita by fangaijun at 2018/02/06 start */
 extern struct timespec last_jeita_time;
@@ -112,6 +137,7 @@ static bool asus_flow_processing = 0;
 extern int BR_countrycode;
 int asus_get_prop_batt_temp(struct smb_charger *chg);
 int asus_get_prop_batt_volt(struct smb_charger *chg);
+int asus_get_prop_charging_current(struct smb_charger *chg);
 int asus_get_prop_batt_capacity(struct smb_charger *chg);
 int asus_get_prop_batt_health(struct smb_charger *chg);
 int asus_get_prop_usb_present(struct smb_charger *chg);
@@ -3440,10 +3466,21 @@ int asus_get_prop_batt_volt(struct smb_charger *chg)
 	union power_supply_propval volt_val = {0, };
 	int rc;
 
-	rc = smblib_get_prop_from_bms(chg, POWER_SUPPLY_PROP_CURRENT_NOW,
+	rc = smblib_get_prop_from_bms(chg, POWER_SUPPLY_PROP_VOLTAGE_NOW,
 					&volt_val);
 
 	return volt_val.intval;
+}
+
+int asus_get_prop_charging_current(struct smb_charger *chg)
+{
+	union power_supply_propval current_val = {0, };
+	int rc;
+
+	rc = smblib_get_prop_from_bms(chg, POWER_SUPPLY_PROP_CURRENT_NOW,
+					&current_val);
+
+	return current_val.intval;
 }
 
 int asus_get_prop_batt_capacity(struct smb_charger *chg)
@@ -3553,6 +3590,8 @@ void asus_batt_RTC_work(struct work_struct *dat)
 #define ICL_1500mA	0x3C
 #define ICL_1900mA	0x4C
 #define ICL_2000mA	0x50
+#define ICL_2050mA	0x52
+#define ICL_2500mA	0x64
 #define ICL_2850mA	0x72
 #define ICL_3000mA	0x78
 #define ASUS_MONITOR_CYCLE		60000
@@ -3598,6 +3637,8 @@ void smblib_asus_monitor_start(struct smb_charger *chg, int time)
 #define SMBCHG_FAST_CHG_CURRENT_VALUE_1500MA 	0x3C
 #define SMBCHG_FAST_CHG_CURRENT_VALUE_2000MA 	0x50
 #define SMBCHG_FAST_CHG_CURRENT_VALUE_2050MA 	0x52
+#define SMBCHG_FAST_CHG_CURRENT_VALUE_2500MA	0x64
+#define SMBCHG_FAST_CHG_CURRENT_VALUE_2850MA	0x72
 #define SMBCHG_FAST_CHG_CURRENT_VALUE_3000MA 	0x78
 
 /* Huaqin modify for ZQL1820-HQ000002  Adjust JEITA according to customer require by gaochao at 2018/10/11 start */
@@ -3849,6 +3890,7 @@ void jeita_rule(void)
 	int bat_temp;
 	int bat_health;
 	int bat_capacity;
+	int charging_current;
 	u8 charging_enable;
 	u8 FV_CFG_reg_value;
 	u8 FCC_reg_value;
@@ -3895,10 +3937,11 @@ void jeita_rule(void)
 	/* Huaqin add for ZQL1650-76 Report battery temperature to upper by gaochao at 2018/02/07 end */
 
 	bat_volt = asus_get_prop_batt_volt(smbchg_dev);
+	charging_current = asus_get_prop_charging_current(smbchg_dev);
 	bat_capacity = asus_get_prop_batt_capacity(smbchg_dev);
 	state = smbchg_jeita_judge_state(state, bat_temp);
-	printk("%s: state=%d,batt_health = %s, bat_temp = %d, bat_volt = %d, bat_capacity=%d,ICL = 0x%x, FV_reg=0x%x, Countrycode %d\n",
-		__func__,state, health_type[bat_health], bat_temp, bat_volt,bat_capacity, ICL_reg, FV_reg,BR_countrycode);
+	printk("%s: state=%d, batt_health = %s, bat_temp = %d, bat_volt = %d,charg_current = %d, bat_capacity=%d, ICL = 0x%x, FV_reg=0x%x\n",
+		__func__,state, health_type[bat_health], bat_temp, bat_volt,charging_current, bat_capacity, ICL_reg, FV_reg);
 
 	switch (state) {
 	case JEITA_STATE_LESS_THAN_0:
@@ -3945,8 +3988,27 @@ void jeita_rule(void)
 			FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_1500MA;
 		}
 		FV_CFG_reg_value = SMBCHG_FLOAT_VOLTAGE_VALUE_4P350;
-		FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_2000MA;
-		printk("%s: 20 <= temperature < 50\n", __func__);
+
+		switch (charge_mode) {
+				case 0:
+					FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_2000MA;
+					break;
+				case 1:
+					FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_2050MA;
+					break;
+				case 2:
+					FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_2500MA;
+					break;
+				case 3:
+					FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_2850MA;
+					break;
+				case 4:
+					FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_3000MA;
+					break;
+				default:
+					FCC_reg_value = SMBCHG_FAST_CHG_CURRENT_VALUE_2000MA;
+					break;
+			}
 		rc = SW_recharge(smbchg_dev);
 		if (rc < 0) {
 			printk("%s: SW_recharge failed rc = %d\n", __func__, rc);
@@ -4285,7 +4347,7 @@ void asus_chg_flow_work(struct work_struct *work)
 			printk("%s: Couldn't read fast_CURRENT_LIMIT_CFG_REG\n", __func__);
 		printk("asus_chg_flow_work dcp_USBIN_1_cc=0x%x\n",USBIN_1_cc);
 
-		set_icl = ICL_1000mA;                                                                                                                                 //reg=1370 bit7-bit0
+		set_icl = ICL_1500mA;                                                                                                                                 //reg=1370 bit7-bit0
 		rc = smblib_masked_write(smbchg_dev, USBIN_CURRENT_LIMIT_CFG_REG,
 			USBIN_CURRENT_LIMIT_MASK, set_icl);
 		if (rc < 0)
@@ -4429,8 +4491,33 @@ void asus_adapter_adc_work(struct work_struct *work)
 			usb_max_current = ICL_2000mA;
 		break;
 	case OTHERS:
-			usb_max_current = ICL_2000mA;
-		break;
+		{
+			//setting max allowed current from adapter
+			switch (adapter_ceeling_current) {
+				case 0:
+					usb_max_current = ICL_2000mA;
+					break;
+				case 1:
+					usb_max_current = ICL_2050mA;
+					break;
+				case 2:
+					usb_max_current = ICL_2500mA;
+					break;
+				case 3:
+					usb_max_current = ICL_2850mA;
+					break;
+				case 4:
+					usb_max_current = ICL_3000mA;
+					break;
+				case 5:
+					usb_max_current = ICL_1000mA;
+					break;
+				default:
+					usb_max_current = ICL_2000mA;
+					break;
+	 			}
+			break;
+		}
 	case ADC_NOT_READY:
 		usb_max_current = ICL_1000mA;
 		break;
