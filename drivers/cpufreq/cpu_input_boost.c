@@ -12,6 +12,8 @@
 #include <linux/kthread.h>
 #include <linux/moduleparam.h>
 
+unsigned long last_input_jiffies;
+
 static unsigned int input_boost_freq_lp __read_mostly =
 	CONFIG_INPUT_BOOST_FREQ_LP;
 static unsigned int input_boost_freq_hp __read_mostly =
@@ -26,6 +28,9 @@ static unsigned short input_boost_duration __read_mostly =
 static unsigned short wake_boost_duration __read_mostly =
 	CONFIG_WAKE_BOOST_DURATION_MS;
 
+static int frame_boost_timeout __read_mostly =
+	CONFIG_FRAME_BOOST_TIMEOUT;
+
 module_param(input_boost_freq_lp, uint, 0644);
 module_param(input_boost_freq_hp, uint, 0644);
 module_param(max_boost_freq_lp, uint, 0644);
@@ -33,6 +38,7 @@ module_param(max_boost_freq_hp, uint, 0644);
 
 module_param(input_boost_duration, short, 0644);
 module_param(wake_boost_duration, short, 0644);
+module_param(frame_boost_timeout, int, 0644);
 
 enum {
 	SCREEN_OFF,
@@ -96,6 +102,18 @@ static void update_online_cpu_policy(void)
 	cpu = cpumask_first_and(cpu_perf_mask, cpu_online_mask);
 	cpufreq_update_policy(cpu);
 	put_online_cpus();
+}
+
+bool should_kick_frame_boost(void)
+{
+	if (frame_boost_timeout == 0)
+		return true;
+
+	if (frame_boost_timeout < 0)
+		return false;
+
+	return time_before(jiffies, last_input_jiffies +
+			   msecs_to_jiffies(frame_boost_timeout));
 }
 
 static void __cpu_input_boost_kick(struct boost_drv *b)
@@ -259,6 +277,8 @@ static void cpu_input_boost_input_event(struct input_handle *handle,
 	struct boost_drv *b = handle->handler->private;
 
 	__cpu_input_boost_kick(b);
+
+	last_input_jiffies = jiffies;
 }
 
 static int cpu_input_boost_input_connect(struct input_handler *handler,
