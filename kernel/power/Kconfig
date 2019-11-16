@@ -321,6 +321,7 @@ config PM_GENERIC_DOMAINS_OF
 	depends on PM_GENERIC_DOMAINS && OF
 
 config CPU_PM
+        bool
 
 config SUSPEND_TIME_TIMEKEEPING
 	bool "get suspend time from timekeeping"
