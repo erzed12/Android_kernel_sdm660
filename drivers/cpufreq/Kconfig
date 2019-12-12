@@ -301,14 +301,6 @@ config MAX_BOOST_FREQ_PERF
 	help
 	  Max-boost frequency for the performance CPU cluster.
 
-config FRAME_BOOST_TIMEOUT
-	int "Post-input frame boost timeout"
-	depends on CPU_INPUT_BOOST
-	default "3250"
-	help
-	  The timeout in milliseconds during which we boost the CPU and DDR bus
-	  when a new frame is committed to a DRM display, counting from when the
-	  last input event was received.
 endif
 
 comment "CPU frequency scaling drivers"
