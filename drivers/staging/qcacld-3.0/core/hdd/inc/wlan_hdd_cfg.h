@@ -16520,12 +16520,6 @@ struct hdd_config {
 
 	bool pktcap_mode_enable;
 	uint8_t pktcapture_mode;
-
-#ifdef FW_THERMAL_THROTTLE_SUPPORT
-	uint16_t thermal_sampling_time;
-	uint16_t thermal_throt_dc;
-#endif
-	bool disable_4way_hs_offload;
 	bool ShortGI80MhzEnable;
 	bool ShortGI160MhzEnable;
 };
