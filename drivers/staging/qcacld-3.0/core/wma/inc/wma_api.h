@@ -620,4 +620,15 @@ QDF_STATUS wma_send_dhcp_ind(uint16_t type, uint8_t device_mode,
 enum pktcapture_tx_status
 wma_mgmt_pktcapture_status_map(uint8_t status);
 
+/**
+ * wma_mgmt_pktcapture_status_map() - map Tx status for MGMT packets
+ * with packet capture Tx status
+ * @status: Tx status
+ * @is_data_pkt: Tx status for data packets
+ *
+ * Return: pktcapture_tx_status enum
+ */
+enum pktcapture_tx_status
+wma_mgmt_pktcapture_status_map(uint8_t status);
+
 #endif
